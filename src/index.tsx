@@ -17,7 +17,8 @@ type NativeModuleType = typeof NativeModules & {
       printerDpi: number,
       printerWidthMM: number,
       printerNbrCharactersPerLine: number,
-      timeout: number
+      timeout: number,
+      charsetEncoding: string
     ): Promise<void>;
     printBluetooth(
       macAddress: string,
@@ -27,7 +28,8 @@ type NativeModuleType = typeof NativeModules & {
       mmFeedPaper: number,
       printerDpi: number,
       printerWidthMM: number,
-      printerNbrCharactersPerLine: number
+      printerNbrCharactersPerLine: number,
+      charsetEncoding: string
     ): Promise<void>;
     getBluetoothDeviceList(): Promise<BluetoothPrinter[]>;
   };
@@ -44,6 +46,7 @@ interface PrinterInterface {
   printerDpi: number;
   printerWidthMM: number;
   printerNbrCharactersPerLine: number;
+  charsetEncoding: string;
 }
 
 interface PrintTcpInterface extends PrinterInterface {
@@ -68,6 +71,7 @@ let defaultConfig: PrintTcpInterface & PrintBluetoothInterface = {
   printerWidthMM: 80,
   printerNbrCharactersPerLine: 42,
   timeout: 30000,
+  charsetEncoding: "windows-1250"
 };
 
 const getConfig = (
@@ -90,6 +94,7 @@ const printTcp = async (
     printerWidthMM,
     printerNbrCharactersPerLine,
     timeout,
+    charsetEncoding
   } = getConfig(args);
 
   await ThermalPrinterModule.printTcp(
@@ -102,7 +107,8 @@ const printTcp = async (
     printerDpi,
     printerWidthMM,
     printerNbrCharactersPerLine,
-    timeout
+    timeout,
+    charsetEncoding
   );
 };
 
@@ -118,6 +124,7 @@ const printBluetooth = (
     printerDpi,
     printerWidthMM,
     printerNbrCharactersPerLine,
+    charsetEncoding
   } = getConfig(args);
 
   return ThermalPrinterModule.printBluetooth(
@@ -128,7 +135,8 @@ const printBluetooth = (
     mmFeedPaper,
     printerDpi,
     printerWidthMM,
-    printerNbrCharactersPerLine
+    printerNbrCharactersPerLine,
+    charsetEncoding
   );
 };
 

@@ -3,6 +3,8 @@ package com.reactnativethermalprinter;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
@@ -10,6 +12,7 @@ import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
 import com.dantsu.escposprinter.EscPosPrinter;
+import com.dantsu.escposprinter.EscPosCharsetEncoding;
 import com.dantsu.escposprinter.connection.DeviceConnection;
 import com.dantsu.escposprinter.connection.bluetooth.BluetoothPrintersConnections;
 import com.dantsu.escposprinter.connection.tcp.TcpConnection;
@@ -63,7 +66,7 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
-  public void printTcp(String ipAddress, double port, String payload, boolean autoCut, boolean openCashbox, double mmFeedPaper, double printerDpi, double printerWidthMM, double printerNbrCharactersPerLine, double timeout, Promise promise) {
+  public void printTcp(String ipAddress, double port, String payload, boolean autoCut, boolean openCashbox, double mmFeedPaper, double printerDpi, double printerWidthMM, double printerNbrCharactersPerLine, double timeout, String charsetEncoding, Promise promise) {
 //
 //        05-05-2021
 //        https://reactnative.dev/docs/native-modules-android
@@ -77,14 +80,14 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
     this.jsPromise = promise;
     try {
       TcpConnection connection = new TcpConnection(ipAddress, (int) port, (int) timeout);
-      this.printIt(connection, payload, autoCut, openCashbox, mmFeedPaper, printerDpi, printerWidthMM, printerNbrCharactersPerLine);
+      this.printIt(connection, payload, autoCut, openCashbox, mmFeedPaper, printerDpi, printerWidthMM, printerNbrCharactersPerLine, charsetEncoding);
     } catch (Exception e) {
       this.jsPromise.reject("Connection Error", e.getMessage());
     }
   }
 
   @ReactMethod
-  public void printBluetooth(String macAddress, String payload, boolean autoCut, boolean openCashbox, double mmFeedPaper, double printerDpi, double printerWidthMM, double printerNbrCharactersPerLine, Promise promise) {
+  public void printBluetooth(String macAddress, String payload, boolean autoCut, boolean openCashbox, double mmFeedPaper, double printerDpi, double printerWidthMM, double printerNbrCharactersPerLine, String charsetEncoding, Promise promise) {
     this.jsPromise = promise;
     BluetoothConnection btPrinter;
 
@@ -108,7 +111,7 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
       ActivityCompat.requestPermissions(getCurrentActivity(), new String[]{Manifest.permission.BLUETOOTH_SCAN}, 1);
     } else {
       try {
-        this.printIt(btPrinter.connect(), payload, autoCut, openCashbox, mmFeedPaper, printerDpi, printerWidthMM, printerNbrCharactersPerLine);
+        this.printIt(btPrinter.connect(), payload, autoCut, openCashbox, mmFeedPaper, printerDpi, printerWidthMM, printerNbrCharactersPerLine, charsetEncoding);
       } catch (Exception e) {
         this.jsPromise.reject("Connection Error", e.getMessage());
       }
@@ -169,6 +172,17 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
     }
   }
 
+  private Bitmap getBitmapFromBase64(String base64) {
+    try {
+      byte[] encodeByte = Base64.decode(base64, Base64.DEFAULT);
+      Bitmap bitmap = BitmapFactory.decodeByteArray(encodeByte, 0, encodeByte.length);
+      return bitmap;
+    } catch (Exception e) {
+      e.printStackTrace();
+      return null;
+    }
+  }
+  
   /**
    * Synchronous printing
    */
@@ -180,16 +194,17 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
     StringBuffer sb = new StringBuffer();
     while (m.find()) {
       String firstGroup = m.group(1);
-      m.appendReplacement(sb, PrinterTextParserImg.bitmapToHexadecimalString(printer, getBitmapFromUrl(firstGroup)));
+      m.appendReplacement(sb, PrinterTextParserImg.bitmapToHexadecimalString(printer, getBitmapFromBase64(firstGroup)));
     }
     m.appendTail(sb);
 
     return sb.toString();
   }
 
-  private void printIt(DeviceConnection printerConnection, String payload, boolean autoCut, boolean openCashbox, double mmFeedPaper, double printerDpi, double printerWidthMM, double printerNbrCharactersPerLine) {
+  private void printIt(DeviceConnection printerConnection, String payload, boolean autoCut, boolean openCashbox, double mmFeedPaper, double printerDpi, double printerWidthMM, double printerNbrCharactersPerLine, String charsetEncoding) {
     try {
-      EscPosPrinter printer = new EscPosPrinter(printerConnection, (int) printerDpi, (float) printerWidthMM, (int) printerNbrCharactersPerLine);
+      EscPosPrinter printer = new EscPosPrinter(printerConnection, (int) printerDpi, (float) printerWidthMM, (int) printerNbrCharactersPerLine, new EscPosCharsetEncoding(charsetEncoding, 45));
+      printer.useEscAsteriskCommand(true);
       String processedPayload = preprocessImgTag(printer, payload);
 
       if (openCashbox) {
