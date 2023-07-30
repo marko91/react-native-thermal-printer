@@ -182,6 +182,18 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
       return null;
     }
   }
+
+  private long getDelayTime(String text) {
+    int delay = 100;
+
+    String[] imagesArray = text.split("</img>");
+    delay += (imagesArray.length) * 400;
+
+    String[] rowsArray = text.split("\n");
+    delay += (rowsArray.length * 50);
+
+    return delay;
+  }
   
   /**
    * Synchronous printing
@@ -194,7 +206,31 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
     StringBuffer sb = new StringBuffer();
     while (m.find()) {
       String firstGroup = m.group(1);
-      m.appendReplacement(sb, PrinterTextParserImg.bitmapToHexadecimalString(printer, getBitmapFromBase64(firstGroup)));
+      Bitmap bitmap = getBitmapFromBase64(firstGroup);
+      int targetWidth = printer.getPrinterWidthPx();
+      int targetHeight = Math.round(((float) bitmap.getHeight()) * ((float) targetWidth) / ((float) bitmap.getWidth()));
+      Bitmap rescaledBitmap = Bitmap.createScaledBitmap(
+          bitmap,
+          targetWidth,
+          targetHeight,
+          true);
+
+
+      StringBuilder imageHexText = new StringBuilder();
+      int imageHeightCut = 240;
+      for (int y = 0; y < targetHeight; y += imageHeightCut) {
+        Bitmap bitmapPart = Bitmap.createBitmap(rescaledBitmap, 0, y, targetWidth,
+            (y + imageHeightCut >= targetHeight) ? targetHeight - y : imageHeightCut);
+        if (y > 0) {
+          imageHexText.append("<img>"); // don't add starting tag if first image
+        }
+        imageHexText.append(PrinterTextParserImg.bitmapToHexadecimalString(printer, bitmapPart, false));
+        if (y + imageHeightCut < targetHeight) { // append closing tag if not the last image
+          imageHexText.append("</img>\n");
+        }
+      }
+      
+      m.appendReplacement(sb, imageHexText.toString());
     }
     m.appendTail(sb);
 
@@ -207,6 +243,8 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
       printer.useEscAsteriskCommand(true);
       String processedPayload = preprocessImgTag(printer, payload);
 
+      long delay = getDelayTime(processedPayload);
+
       if (openCashbox) {
         printer.printFormattedTextAndOpenCashBox(processedPayload, (float) mmFeedPaper);
       } else if (autoCut) {
@@ -214,6 +252,8 @@ public class ThermalPrinterModule extends ReactContextBaseJavaModule {
       } else {
         printer.printFormattedText(processedPayload, (float) mmFeedPaper);
       }
+      
+      Thread.sleep(delay);
 
       printer.disconnectPrinter();
       this.jsPromise.resolve(true);
